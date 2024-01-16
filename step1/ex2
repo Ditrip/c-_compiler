@@ -1,0 +1,8 @@
+int x;
+hello compilers;
+x=124+3;
+// comment
+if (x == 127 | y <= 1){
+    return 1;
+}
+return 0;

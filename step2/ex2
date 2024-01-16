@@ -1,0 +1,10 @@
+int main(void){
+    int y;
+    y = 5;
+    if(x == 3){
+        x = 5;
+    } else {
+        x = y;
+    }
+}
+

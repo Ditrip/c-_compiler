@@ -1,0 +1,271 @@
+/*
+CEI222: Project Step[1]
+*/
+
+%{
+
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+//Storage for integer numbers
+int *intNums;
+int *intLoc;
+static int intCount = 0;
+
+//Storage for all tokens except numbers
+char **tokens;
+int *tokenLoc;
+static int tokenCount = 0;
+
+void checkTokenArray();
+void resizeTokenArray();
+void writeToken(char str[]);
+
+//Line counter
+static int linesCount = 1;
+
+//Store all above storages in correct order 
+//To identify (0 = string, 1 = int)
+int *tokSeq;
+static int tokSeqCount = 0;
+
+%}
+
+letter [a-zA-Z]
+num [0-9]
+intNum {num}+
+var {letter}+({num}|{letter})*
+sp ("\n"|" "|"\t")
+comS "//"(.)*\n
+arithOp "+"|"-"|"/"|"*"|"="
+comparator "<"|"<="|">"|">="|"=="|"!="
+keyword "int"|"if"|"else"|"return"|"void"|"while"
+bracket "("|")"|"{"|"}"|"["|"]"
+%x c_comments
+
+%%
+
+"/*" { 
+    BEGIN(c_comments);
+    printf("Found comment section (/* */)\n");
+}
+<c_comments>. {}
+<c_comments>\n {
+    checkTokenArray();
+    writeToken("\\n");
+    printf("Found new line on line %d\n",linesCount);
+    linesCount++;
+    }
+<c_comments>"*/" { BEGIN(INITIAL);}
+
+{comS} {
+    printf("Found comment section (//)\n");
+    checkTokenArray();
+    writeToken("\\n");
+    printf("Found new line on line %d\n",linesCount);
+    linesCount++;
+}
+
+{keyword} {
+    checkTokenArray();
+    writeToken(yytext);
+    printf("Found keyword on line %d (Keyword: %s)\n", linesCount, tokens[tokenCount-1]);
+}
+
+{bracket} {
+    checkTokenArray();
+    writeToken(yytext);
+    printf("Found bracket on line %d (br: %s )\n", linesCount, tokens[tokenCount-1]);
+}
+
+{arithOp} {
+    checkTokenArray();
+    writeToken(yytext);
+    printf("Found arithmetic operator on line %d (Op: %s )\n", linesCount, tokens[tokenCount-1]);
+}
+
+{comparator} {
+    checkTokenArray();
+    writeToken(yytext);
+    printf("Found comparator on line %d (Comp: %s )\n", linesCount, tokens[tokenCount-1]);
+}
+
+";" {
+    checkTokenArray();
+    writeToken(yytext);
+    printf("Found semicolon on line %d (%s)\n", linesCount, tokens[tokenCount-1]);
+}
+
+"," {
+    checkTokenArray();
+    writeToken(yytext);
+    printf("Found comma on line %d (%s)\n", linesCount, tokens[tokenCount-1]);
+}
+
+
+{var} {
+    checkTokenArray();
+    writeToken(yytext);
+    printf("Found variable on line %d (Value: %s )\n", linesCount, tokens[tokenCount-1]);
+}
+
+{intNum} {
+        //Allocating block of memory (int type)
+        if(intCount == 0){
+            intNums = (int*)malloc(sizeof(int));
+            intLoc = (int*)malloc(sizeof(int));
+        }
+        if(tokSeq == NULL){
+            tokSeq = (int*)malloc(sizeof(int));
+        }
+        //If the memory didn't allocate, exit
+        if(tokSeq == NULL || intNums == NULL || intLoc == NULL){
+            printf("Arrays in \"intNum\" have not been declared (exit)");
+            exit(0);
+        }
+        //Stores the number and the line number where is located
+        intNums[intCount] = atoi(yytext);
+        intLoc[intCount] = linesCount;
+        printf("Found integer number on line %d (Value: %d )\n", linesCount, intNums[intCount]);
+        intCount++;
+        // Increse the size of memory
+        intNums = (int*)realloc(intNums, sizeof(int) * (1 + intCount));
+        intLoc = (int*)realloc(intLoc, sizeof(int) * (1 + intCount));
+        
+        tokSeq[tokSeqCount] = 1;
+        tokSeqCount++;
+        tokSeq = (int*)realloc(tokSeq, sizeof(int) * (1 + tokSeqCount));
+    }
+
+{sp} {
+    if(strcmp(yytext,"\n") == 0){
+        checkTokenArray();
+        writeToken("\\n");
+        printf("Found new line on line %d\n",linesCount);
+        
+        linesCount++;
+    } else if(strcmp(yytext,"\t") == 0){
+        checkTokenArray();
+        writeToken("\\t");
+        printf("Found tab on line %d\n",linesCount);
+    } else if(strcmp(yytext," ") == 0){
+        checkTokenArray();
+        writeToken(" ");
+        printf("Found space on line %d\n",linesCount);
+    }
+}
+
+. {printf("Unrecognized token on line %d (Value: %s )\n", linesCount,yytext);}
+
+%%
+
+int yywrap(){}
+
+void checkTokenArray(){
+    if(tokens == NULL){
+        tokens = malloc(sizeof(*tokens));
+        tokenLoc = (int*)malloc(sizeof(int));
+    }
+    if(tokSeq == NULL){
+        tokSeq = (int*)malloc(sizeof(int));
+    }
+    if(tokens == NULL || tokSeq == NULL || tokenLoc == NULL){
+        printf("Token array have not been declared (exit)\n");
+        exit(0);
+    }
+
+}
+
+void resizeTokenArray(){
+    tokens = realloc(tokens,sizeof(*tokens) * ( 1 + tokenCount));
+    tokenLoc = (int*)realloc(tokenLoc, sizeof(int) * ( 1 + tokenCount));
+    tokSeq = (int*)realloc(tokSeq, sizeof(int) * (1 + tokSeqCount));
+
+    if(tokens == NULL || tokenLoc == NULL || tokSeq == NULL){
+        printf("Something went wrong\n");
+    }
+}
+
+void writeToken(char str[]){
+    char *p = (char*)malloc(sizeof(char));
+    tokens[tokenCount] = strcpy(p,str);
+    tokenLoc[tokenCount] = linesCount;
+    tokenCount++;
+
+    tokSeq[tokSeqCount] = 0;
+    tokSeqCount++;
+    resizeTokenArray();
+}
+
+int main(int argc, char *argv[]){
+
+    FILE *f;
+
+    if(argc == 2){
+        yyin = fopen(argv[1], "rt");
+    } else {
+        printf("Must be only one input File (exit)\n");
+        exit(0);
+    }
+
+    yylex();
+    fclose(yyin);
+    int opt = 0;
+    while(1 == 1){
+        printf("\nSelect option:\n1.Print all integers\n2.Print all tokens(except numbers)\n3.Print all\n4.Exit\nOpt: ");
+        scanf("%d",&opt);
+        switch(opt){
+            case 1:
+                if(intNums != NULL){
+                    printf("\nInt values:\n");
+                    int i;
+                    for(i = 0; i < intCount; i++){
+                        printf("%d: %d (Line: %d)\n",i,intNums[i],intLoc[i]);
+                    }
+                }else{
+                    printf("There is no integer number\n");
+                }
+            break;
+            case 2:
+                if(tokens != NULL){
+                    printf("\nTokens:\n");
+                    int i;
+                    for(i = 0; i < tokenCount; i++){
+                        printf("%d: %s (Line: %d)\n",i,tokens[i],tokenLoc[i]);
+                    }
+                }else{
+                    printf("There is no token\n");
+                }
+            break;
+            case 3:
+               if(tokSeq != NULL){
+                    printf("\nAll:\n");
+                    int i,tInd=0,iInd=0;
+                    for(i = 0; i < tokSeqCount; i++){
+                        switch(tokSeq[i]){
+                            case 0:
+                                printf("%d: %s (Line: %d)\n",i,tokens[tInd],tokenLoc[tInd]);
+                                tInd++;
+                            break;
+                            case 1:
+                                printf("%d: %d (Line: %d)\n",i,intNums[iInd],intLoc[iInd]);
+                                iInd++;
+                            break;
+                        }
+                    }
+               }
+            break;
+            case 4:
+                goto exit_loop;
+            break;
+        }
+    }
+    exit_loop:
+    free(tokens);
+    free(tokenLoc);
+    free(intNums);
+    free(intLoc);
+    free(tokSeq);
+    return 0;
+}

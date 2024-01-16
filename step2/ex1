@@ -1,0 +1,4 @@
+int lox123 [201];
+void var1;
+
+int main(int i, int array[])

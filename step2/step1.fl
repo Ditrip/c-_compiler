@@ -1,0 +1,180 @@
+/*
+CEI222: Project Step[2]
+*/
+
+%{
+
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include "step2.tab.h"
+char *p;
+extern char **msgList;
+extern int msgCount;
+%}
+
+letter [a-zA-Z]
+num [0-9]
+intNum {num}+
+var {letter}+({num}|{letter})*
+sp ("\n"|" "|"\t")
+comS "//"(.)*\n
+arithOp "+"|"-"|"/"|"*"|"="
+comparator "<"|"<="|">"|">="|"=="|"!="
+keyword "int"|"if"|"else"|"return"|"void"|"while"
+bracket "("|")"|"{"|"}"|"["|"]"
+%x c_comments
+
+%%
+
+"/*" { 
+    BEGIN(c_comments);
+}
+<c_comments>. { }
+<c_comments>\n { }
+<c_comments>"*/" { BEGIN(INITIAL);}
+
+{comS} {}
+
+{keyword} {
+    if(strcmp(yytext,"int") == 0)
+        return T_INT;
+    else if(strcmp(yytext,"if") == 0)
+        return T_IF;
+    else if(strcmp(yytext,"else") == 0)
+        return T_ELSE;
+    else if(strcmp(yytext,"while") == 0)
+        return T_WHILE;
+    else if(strcmp(yytext,"void") == 0)
+        return T_VOID;
+    else
+        return T_RETURN;
+    
+}
+
+{bracket} {
+    switch(yytext[0]){
+        case '[':
+            return T_LEFT_SB;
+        case ']':
+            return T_RIGHT_SB;
+        case '(':
+            return T_LEFT_PR;
+        case ')':
+            return T_RIGHT_PR;
+        case '{':
+            return T_LEFT_BR;
+        case '}':
+            return T_RIGHT_BR;
+    }
+    printf("Brackets didn't returned");
+
+}
+
+{arithOp} {
+    switch(yytext[0]){
+        case '+':
+            return T_PLUS;
+        case '-':
+            return T_MINUS;
+        case '*':
+            return T_MUL;
+        case '/':
+            return T_DIV;
+        case '=':
+            return T_EQUAL;
+    }
+
+    printf("ArithOp wasn't found");
+
+}
+
+{comparator} {
+    if(strcmp(yytext,">=") == 0)
+        return T_CBE; 
+    else if(strcmp(yytext,"<=") == 0)
+        return T_CSE;
+    else if(yytext[0] == '>')
+        return T_CBI;
+    else if(yytext[0] == '<')
+        return T_CSM;
+    else if(strcmp(yytext,"==") == 0)
+        return T_CEQ;
+    else if(strcmp(yytext,"!=") == 0)
+        return T_CNE;
+}
+
+";" {
+    return T_SEMICOLON;
+}
+
+"," {
+    return T_COMMA;
+}
+
+
+{var} {
+    //free(p);
+    char *p = (char*)malloc(sizeof(char));
+    strcpy(p,yytext);
+    yylval.str = p;
+    return T_ID;
+}
+
+{intNum} {
+    return T_NUM;
+}
+
+{sp} {
+}
+
+. { }
+
+%%
+
+int yywrap(){
+    return 1;
+}
+
+int main(int argc, char *argv[]){
+
+    FILE *f;
+
+    if(argc == 2){
+        yyin = fopen(argv[1], "r");
+    } else {
+        printf("Must be only one input File (exit)\n");
+        exit(0);
+    }
+
+    do{
+        yyparse();
+    }while(!feof(yyin));
+
+    fclose(yyin);
+
+    int opt = 0;
+
+    do{
+        printf("Select option (number of messeges: %d):\n"
+        ,msgCount);
+        printf("1.Up-Bottom tree\n2.Bottom-Up (default) tree\n3.Exit\nOpt:");
+        scanf("%d",&opt);
+        int i;
+        switch(opt){
+            case 1:
+                for(i=msgCount-1; i >= 0; i--){
+                    printf("%s",msgList[i]);
+                }
+                break;
+            case 2:
+                for(i=0; i < msgCount; i++){
+                    printf("%s",msgList[i]);
+                }
+                break;
+        };
+    }while(opt != 3);
+
+
+    return 0;
+}
